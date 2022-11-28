@@ -1,9 +1,6 @@
-use std::{
-    error,
-    ffi::{c_char, c_int, c_void},
-};
+use std::ffi::{c_char, c_int, c_void};
 
-use crate::libs::{NativeLibrary, NativeMethod};
+use crate::libs::{LibError, NativeLibrary, NativeMethod};
 
 use super::types::{
     MonoAssembly, MonoClass, MonoDomain, MonoImage, MonoMethod, MonoObject, MonoString, MonoThread,
@@ -48,7 +45,7 @@ pub struct MonoExports {
 }
 
 impl MonoExports {
-    pub fn new(lib: &NativeLibrary) -> Result<Self, Box<dyn error::Error>> {
+    pub fn new(lib: &NativeLibrary) -> Result<Self, LibError> {
         Ok(MonoExports {
             mono_jit_init_version: Some(lib.sym("mono_jit_init_version")?),
             mono_debug_domain_create: {

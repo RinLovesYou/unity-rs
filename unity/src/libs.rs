@@ -19,7 +19,13 @@
 //!
 //! let func: extern fn() = unsafe { mem::transmute(lib.get_fn_ptr("func_name")?) };
 
-use std::{error, ffi::c_void, marker::PhantomData, ops::Deref, path::PathBuf};
+use std::{
+    error,
+    ffi::c_void,
+    marker::PhantomData,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 
 /// possible library loading errors
@@ -40,6 +46,9 @@ pub enum LibError {
     /// failed to get function pointer
     #[error("Failed to get function pointer!")]
     FailedToGetFnPtr,
+
+    #[error("Failed to create C-String")]
+    FailedToCreateCString,
 }
 
 /// a representation of a permanently loaded library
@@ -56,11 +65,11 @@ pub struct NativeLibrary {
 impl NativeLibrary {
     /// gets a function pointer
     #[cfg(target_os = "linux")]
-    pub fn sym<T>(&self, name_str: &str) -> Result<NativeMethod<T>, Box<dyn error::Error>> {
-        let name = std::ffi::CString::new(name_str)?;
+    pub fn sym<T>(&self, name_str: &str) -> Result<NativeMethod<T>, LibError> {
+        let name = std::ffi::CString::new(name_str).map_err(|_| LibError::FailedToCreateCString)?;
         let ptr = unsafe { libc::dlsym(self.handle, name.as_ptr()) };
         if ptr.is_null() {
-            return Err(Box::new(LibError::FailedToGetFnPtr));
+            return Err(LibError::FailedToGetFnPtr);
         }
 
         Ok(NativeMethod {
@@ -71,16 +80,16 @@ impl NativeLibrary {
 
     /// gets a function pointer
     #[cfg(target_os = "windows")]
-    pub fn sym<T>(&self, name_str: &str) -> Result<NativeMethod<T>, Box<dyn error::Error>> {
+    pub fn sym<T>(&self, name_str: &str) -> Result<NativeMethod<T>, LibError> {
         use std::ffi::CString;
 
         use winapi::um::libloaderapi::GetProcAddress;
 
-        let name = CString::new(name_str)?;
+        let name = CString::new(name_str).map_err(|_| LibError::FailedToCreateCString)?;
 
         let ptr = unsafe { GetProcAddress(self.handle.cast(), name.as_ptr()) };
         if ptr.is_null() {
-            return Err(Box::new(LibError::FailedToGetFnPtr));
+            return Err(LibError::FailedToGetFnPtr);
         }
 
         Ok(NativeMethod {
@@ -117,15 +126,19 @@ impl NativeLibrary {
 ///
 /// assert!(lib.is_ok());
 #[cfg(target_os = "linux")]
-pub fn load_lib(path: &PathBuf) -> Result<NativeLibrary, Box<dyn error::Error>> {
+pub fn load_lib<P: AsRef<Path>>(path: P) -> Result<NativeLibrary, LibError> {
+    use std::ffi::CString;
+
+    let path = path.as_ref();
+
     let path_string = path.to_str().ok_or(LibError::FailedToGetLibPath)?;
 
-    let c_path = CString::new(path_string)?;
+    let c_path = CString::new(path_string).map_err(|_| LibError::FailedToCreateCString)?;
 
     let lib = unsafe { libc::dlopen(c_path.as_ptr(), libc::RTLD_NOW | libc::RTLD_GLOBAL) };
 
     if lib.is_null() {
-        return Err(Box::new(LibError::FailedToLoadLib));
+        return Err(LibError::FailedToLoadLib);
     }
 
     let lib_name = path
@@ -169,18 +182,20 @@ pub fn load_lib(path: &PathBuf) -> Result<NativeLibrary, Box<dyn error::Error>> 
 ///
 /// assert!(lib.is_ok());
 #[cfg(target_os = "windows")]
-pub fn load_lib(path: &PathBuf) -> Result<NativeLibrary, Box<dyn error::Error>> {
+pub fn load_lib<P: AsRef<Path>>(path: P) -> Result<NativeLibrary, LibError> {
     use std::ffi::CString;
+
+    let path = path.as_ref();
 
     use winapi::um::libloaderapi::LoadLibraryA;
 
     let path_string = path.to_str().ok_or_else(|| LibError::FailedToGetLibPath)?;
-    let win_path = CString::new(path_string)?;
+    let win_path = CString::new(path_string).map_err(|_| LibError::FailedToCreateCString)?;
 
     let lib = unsafe { LoadLibraryA(win_path.as_ptr()) };
 
     if lib.is_null() {
-        return Err(Box::new(LibError::FailedToLoadLib));
+        return Err(LibError::FailedToLoadLib);
     }
 
     let lib_name = path
