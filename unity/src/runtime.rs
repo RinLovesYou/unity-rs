@@ -128,9 +128,6 @@ fn is_unity(file_path: &PathBuf) -> Result<bool, RuntimeError> {
         .ok_or_else(|| RuntimeError::BasePathNotFound)?
         .to_lowercase();
 
-    let a: char = 'a';
-    println!("{a}\n");
-
     let base_folder = file_path
         .parent()
         .ok_or_else(|| RuntimeError::BasePathNotFound)?;
