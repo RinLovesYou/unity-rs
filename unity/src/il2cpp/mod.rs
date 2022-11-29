@@ -1,3 +1,5 @@
+//! TODO
+
 use std::{error, path::PathBuf};
 
 use thiserror::Error;
@@ -7,15 +9,23 @@ use crate::{
     libs::{self, NativeLibrary},
 };
 
-use self::exports::Il2CppExports;
+use self::{exports::Il2CppExports, types::Il2CppThread};
 
 pub mod exports;
 pub mod types;
 
+/// All errors associatedd with Il2cpp
 #[derive(Debug, Error)]
 pub enum Il2CppError {
+    /// Failed to find the GameAssembly
     #[error("Failed to find GameAssembly")]
     GameAssemblyNotFound,
+    /// A function returned a null pointer, the billion dollar mistake creeps back, thank you FFI!
+    #[error("Function `{0}` returned Null")]
+    ReturnedNull(&'static str),
+    /// An exported function could not be found (please report!)
+    #[error("Function '{0}' not found")]
+    MissingFunction(&'static str),
 }
 
 #[derive(Debug, Clone)]
@@ -41,5 +51,18 @@ impl Il2Cpp {
             exports,
         };
         Ok(il2cpp)
+    }
+
+    pub fn thread_current(&self) -> Result<*mut Il2CppThread, Il2CppError> {
+        match &self.exports.il2cpp_thread_current {
+            None => Err(Il2CppError::MissingFunction("il2cpp_thread_current")),
+            Some(il2cpp_thread_current) => {
+                let res = il2cpp_thread_current();
+                match res.is_null() {
+                    true => Err(Il2CppError::ReturnedNull("il2cpp_thread_current")),
+                    false => Ok(res),
+                }
+            }
+        }
     }
 }

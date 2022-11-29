@@ -1,3 +1,5 @@
+//! TODO
+
 use std::{error, ffi::CString, path::PathBuf};
 
 use thiserror::Error;
@@ -27,6 +29,8 @@ pub enum RuntimeError {
     FailedToInitRuntime,
     #[error("Failed to create C-String")]
     FailedToCreateCString,
+    #[error("{0}")]
+    Passthrough(String),
 }
 
 #[derive(Debug, Clone)]
@@ -105,23 +109,19 @@ impl Runtime {
     pub fn get_current_thread(&self) -> Result<UnityThread, RuntimeError> {
         match self.clone().runtime {
             UnityRuntime::MonoRuntime(mono) => {
-                if let Some(mono_thread_current) = mono.exports.mono_thread_current {
-                    Ok(UnityThread {
-                        inner: mono_thread_current().cast(),
-                    })
-                } else {
-                    Err(RuntimeError::MissingFunc)
-                }
+                let res = mono
+                    .thread_current()
+                    .map_err(|e| RuntimeError::Passthrough(e.to_string()))?;
+
+                Ok(UnityThread { inner: res.cast() })
             }
 
             UnityRuntime::Il2Cpp(il2cpp) => {
-                if let Some(il2cpp_thread_current) = il2cpp.exports.il2cpp_thread_current {
-                    Ok(UnityThread {
-                        inner: il2cpp_thread_current().cast(),
-                    })
-                } else {
-                    Err(RuntimeError::MissingFunc)
-                }
+                let res = il2cpp
+                    .thread_current()
+                    .map_err(|e| RuntimeError::Passthrough(e.to_string()))?;
+
+                Ok(UnityThread { inner: res.cast() })
             }
         }
     }

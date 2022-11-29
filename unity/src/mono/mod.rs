@@ -1,20 +1,29 @@
+//! TODO
+
 use std::{error, path::PathBuf};
 
 use thiserror::Error;
 
-use crate::libs::{self, NativeLibrary};
+use crate::{
+    common::thread::UnityThread,
+    libs::{self, NativeLibrary},
+};
 
-use self::exports::MonoExports;
+use self::{exports::MonoExports, types::MonoThread};
 
 pub mod exports;
 pub mod types;
 
 #[derive(Debug, Error)]
-enum MonoError {
+pub enum MonoError {
     #[error("Failed to get Mono Lib Name")]
     MonoLibName,
     #[error("Failed to get Mono Lib Path")]
     MonoLibPath,
+    #[error("Function `{0}` returned Null")]
+    ReturnedNull(&'static str),
+    #[error("Function '{0}' not found")]
+    MissingFunction(&'static str),
 }
 
 #[derive(Debug, Clone)]
@@ -49,5 +58,28 @@ impl Mono {
         };
 
         Ok(mono)
+    }
+
+    pub fn thread_current(&self) -> Result<*mut MonoThread, MonoError> {
+        match &self.exports.mono_thread_current {
+            None => Err(MonoError::MissingFunction("mono_thread_current")),
+            Some(mono_thread_current) => {
+                let res = mono_thread_current();
+                match res.is_null() {
+                    true => Err(MonoError::ReturnedNull("mono_thread_current")),
+                    false => Ok(res),
+                }
+            }
+        }
+    }
+
+    pub fn thread_set_main(&self, thread: UnityThread) -> Result<(), MonoError> {
+        match &self.exports.mono_thread_set_main {
+            None => Err(MonoError::MissingFunction("mono_thread_set_main")),
+            Some(mono_thread_set_main) => {
+                mono_thread_set_main(thread.inner.cast());
+                Ok(())
+            }
+        }
     }
 }
