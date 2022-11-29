@@ -2,7 +2,12 @@ use std::{error, ffi::CString, path::PathBuf};
 
 use thiserror::Error;
 
-use crate::{common::domain::UnityDomain, il2cpp::Il2Cpp, mono::Mono, utils};
+use crate::{
+    common::{domain::UnityDomain, thread::UnityThread},
+    il2cpp::Il2Cpp,
+    mono::Mono,
+    utils,
+};
 
 #[derive(Debug, Error)]
 pub enum RuntimeError {
@@ -42,6 +47,11 @@ impl Runtime {
         })
     }
 
+    /// the equivalent of `mono_jit_init_version` or `il2cpp_init`
+    ///
+    /// `mono_jit_init_version` requires a name, and a version
+    ///
+    /// `il2cpp_init` just requires a name, it'll ignore the second parameter
     pub fn init(
         &self,
         name: impl Into<String>,
@@ -87,6 +97,30 @@ impl Runtime {
                     Err(RuntimeError::ReturnedNull)
                 } else {
                     Ok(UnityDomain { inner: res.cast() })
+                }
+            }
+        }
+    }
+
+    pub fn get_current_thread(&self) -> Result<UnityThread, RuntimeError> {
+        match self.clone().runtime {
+            UnityRuntime::MonoRuntime(mono) => {
+                if let Some(mono_thread_current) = mono.exports.mono_thread_current {
+                    Ok(UnityThread {
+                        inner: mono_thread_current().cast(),
+                    })
+                } else {
+                    Err(RuntimeError::MissingFunc)
+                }
+            }
+
+            UnityRuntime::Il2Cpp(il2cpp) => {
+                if let Some(il2cpp_thread_current) = il2cpp.exports.il2cpp_thread_current {
+                    Ok(UnityThread {
+                        inner: il2cpp_thread_current().cast(),
+                    })
+                } else {
+                    Err(RuntimeError::MissingFunc)
                 }
             }
         }
