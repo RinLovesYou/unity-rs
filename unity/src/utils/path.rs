@@ -47,10 +47,9 @@ macro_rules! join_dll_path {
 }
 
 pub fn find_mono(game_base_path: &PathBuf, game_data_path: &PathBuf) -> Result<PathBuf, Box<dyn error::Error>> {
-    let folder_names = ["MonoBleedingEdge", "Mono", "MonoBleedingEdge.x64", "MonoBleedingEdge.x86"];
-
+    let folder_names = vec!["MonoBleedingEdge", "Mono", "MonoBleedingEdge.x64", "MonoBleedingEdge.x86"];
     // workaround for weird path behavior, extension will be replaced with platform specific extension.
-    let lib_names = ["libmono.so", "mono.dll", "mono-2.0-bdwgc.dll", "mono-2.0-sgen.dll", "mono-2.0-boehm.dll", "libmonobdwgc-2.0.so"];
+    let lib_names = vec!["libmono.so", "mono.dll", "mono-2.0-bdwgc.dll", "mono-2.0-sgen.dll", "mono-2.0-boehm.dll", "libmonobdwgc-2.0.so"];
 
     for folder_name in folder_names.iter() {
         for lib_name in lib_names.iter() {
@@ -88,8 +87,7 @@ pub fn get_data_path(file_path: &PathBuf) -> Result<PathBuf, Box<dyn error::Erro
     let file_name = file_path.file_stem()
         .ok_or_else(|| PathError::DataPathNotFound)?
         .to_str()
-        .ok_or_else(|| PathError::DataPathNotFound)?
-        .to_lowercase();
+        .ok_or_else(|| PathError::DataPathNotFound)?;
 
     let base_folder = file_path.parent()
         .ok_or_else(|| PathError::DataPathNotFound)?;

@@ -17,10 +17,10 @@ pub struct MonoExports {
     pub mono_thread_set_main: Option<NativeMethod<fn(*mut MonoThread)>>,
     pub mono_domain_set_config:
         Option<NativeMethod<fn(*mut MonoDomain, *const c_char, *const c_char)>>,
-    pub mono_add_internal_call: Option<NativeMethod<fn(*const c_char, *mut c_void)>>,
+    pub mono_add_internal_call: Option<NativeMethod<fn(*const c_char, *mut c_void, *mut c_void)>>,
     pub mono_get_root_domain: Option<NativeMethod<fn() -> *mut MonoDomain>>,
-    pub mono_string_new: Option<NativeMethod<fn(*const c_char) -> *mut MonoString>>,
-    pub mono_domain_assembly_open: Option<NativeMethod<fn(*const c_char) -> *mut MonoAssembly>>,
+    pub mono_string_new: Option<NativeMethod<fn(*mut MonoDomain, *const c_char) -> *mut MonoString>>,
+    pub mono_domain_assembly_open: Option<NativeMethod<fn(*mut MonoDomain, *const c_char) -> *mut MonoAssembly>>,
     pub mono_assembly_get_image: Option<NativeMethod<fn(*mut MonoAssembly) -> *mut MonoImage>>,
     pub mono_class_from_name:
         Option<NativeMethod<fn(*mut MonoImage, *const c_char, *const c_char) -> *mut MonoClass>>,
@@ -43,7 +43,7 @@ pub struct MonoExports {
     pub mono_install_assembly_preload_hook: Option<NativeMethod<fn(*mut c_void, *mut c_void)>>,
     pub mono_install_assembly_search_hook: Option<NativeMethod<fn(*mut c_void, *mut c_void)>>,
     pub mono_install_assembly_load_hook: Option<NativeMethod<fn(*mut c_void, *mut c_void)>>,
-    pub mono_assembly_get_object: Option<NativeMethod<fn(*mut MonoAssembly) -> *mut MonoObject>>,
+    pub mono_assembly_get_object: Option<NativeMethod<fn(*mut MonoDomain, *mut MonoAssembly) -> *mut MonoObject>>,
 }
 
 impl MonoExports {

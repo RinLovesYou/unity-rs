@@ -159,8 +159,7 @@ fn is_unity(file_path: &PathBuf) -> Result<bool, RuntimeError> {
         .file_stem()
         .ok_or_else(|| RuntimeError::BasePathNotFound)?
         .to_str()
-        .ok_or_else(|| RuntimeError::BasePathNotFound)?
-        .to_lowercase();
+        .ok_or_else(|| RuntimeError::BasePathNotFound)?;
 
     let base_folder = file_path
         .parent()
