@@ -2,9 +2,11 @@
 
 use std::ffi::c_char;
 
+use libc::c_void;
+
 use crate::libs::{LibError, NativeLibrary, NativeMethod};
 
-use super::types::{Il2CppDomain, Il2CppThread};
+use super::types::{Il2CppDomain, Il2CppThread, Il2CppObject, Il2CppMethod};
 
 /// Various methods exported by il2cpp
 ///
@@ -15,6 +17,8 @@ pub struct Il2CppExports {
     pub il2cpp_init: Option<NativeMethod<fn(*const c_char) -> *mut Il2CppDomain>>,
     /// returns the current thread
     pub il2cpp_thread_current: Option<NativeMethod<fn() -> *mut Il2CppThread>>,
+    pub il2cpp_runtime_invoke: Option<NativeMethod<fn(*mut Il2CppMethod, *mut Il2CppObject, *mut *mut c_void, *mut *mut Il2CppObject) -> *mut Il2CppObject>>,
+    pub il2cpp_method_get_name: Option<NativeMethod<fn(*mut Il2CppMethod) -> *const c_char>>,
 }
 
 impl Il2CppExports {
@@ -23,6 +27,8 @@ impl Il2CppExports {
         Ok(Il2CppExports {
             il2cpp_init: Some(lib.sym("il2cpp_init")?),
             il2cpp_thread_current: Some(lib.sym("il2cpp_thread_current")?),
+            il2cpp_runtime_invoke: Some(lib.sym("il2cpp_runtime_invoke")?),
+            il2cpp_method_get_name: Some(lib.sym("il2cpp_method_get_name")?),
         })
     }
 }
