@@ -65,10 +65,13 @@ impl NativeLibrary {
     /// gets a function pointer
     #[cfg(target_os = "linux")]
     pub fn sym<T>(&self, name_str: &str) -> Result<NativeMethod<T>, LibError> {
+
+        let display_string = name_str.to_string();
+
         let name = std::ffi::CString::new(name_str).map_err(|_| LibError::FailedToCreateCString)?;
         let ptr = unsafe { libc::dlsym(self.handle, name.as_ptr()) };
         if ptr.is_null() {
-            return Err(LibError::FailedToGetFnPtr);
+            return Err(LibError::FailedToGetFnPtr(display_string));
         }
 
         Ok(NativeMethod {
