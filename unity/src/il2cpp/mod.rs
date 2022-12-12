@@ -65,4 +65,30 @@ impl Il2Cpp {
             }
         }
     }
+
+    pub fn domain_current(&self) -> Result<*mut types::Il2CppDomain, Il2CppError> {
+        match &self.exports.il2cpp_domain_get {
+            None => Err(Il2CppError::MissingFunction("il2cpp_domain_get")),
+            Some(il2cpp_domain_get) => {
+                let res = il2cpp_domain_get();
+                match res.is_null() {
+                    true => Err(Il2CppError::ReturnedNull("il2cpp_domain_get")),
+                    false => Ok(res),
+                }
+            }
+        }
+    }
+
+    pub fn thread_attach(&self, domain: *mut types::Il2CppDomain) -> Result<*mut Il2CppThread, Il2CppError> {
+        match &self.exports.il2cpp_thread_attach {
+            None => Err(Il2CppError::MissingFunction("il2cpp_thread_attach")),
+            Some(il2cpp_thread_attach) => {
+                let res = il2cpp_thread_attach(domain);
+                match res.is_null() {
+                    true => Err(Il2CppError::ReturnedNull("il2cpp_thread_attach")),
+                    false => Ok(res),
+                }
+            }
+        }
+    }
 }

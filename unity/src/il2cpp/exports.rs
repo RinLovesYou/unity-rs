@@ -19,6 +19,8 @@ pub struct Il2CppExports {
     pub il2cpp_thread_current: Option<NativeMethod<fn() -> *mut Il2CppThread>>,
     pub il2cpp_runtime_invoke: Option<NativeMethod<fn(*mut Il2CppMethod, *mut Il2CppObject, *mut *mut c_void, *mut *mut Il2CppObject) -> *mut Il2CppObject>>,
     pub il2cpp_method_get_name: Option<NativeMethod<fn(*mut Il2CppMethod) -> *const c_char>>,
+    pub il2cpp_thread_attach: Option<NativeMethod<fn(*mut Il2CppDomain) -> *mut Il2CppThread>>,
+    pub il2cpp_domain_get: Option<NativeMethod<fn() -> *mut Il2CppDomain>>,
 }
 
 impl Il2CppExports {
@@ -29,6 +31,8 @@ impl Il2CppExports {
             il2cpp_thread_current: Some(lib.sym("il2cpp_thread_current")?),
             il2cpp_runtime_invoke: Some(lib.sym("il2cpp_runtime_invoke")?),
             il2cpp_method_get_name: Some(lib.sym("il2cpp_method_get_name")?),
+            il2cpp_thread_attach: Some(lib.sym("il2cpp_thread_attach")?),
+            il2cpp_domain_get: Some(lib.sym("il2cpp_domain_get")?),
         })
     }
 }
