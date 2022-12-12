@@ -76,7 +76,15 @@ impl MonoExports {
                 }
             },
             mono_add_internal_call: Some(lib.sym("mono_add_internal_call")?),
-            mono_domain_set_config: Some(lib.sym("mono_domain_set_config")?),
+            mono_domain_set_config: {
+                // probably not present on old mono
+                let res = lib.sym("mono_domain_set_config");
+
+                match res.is_err() {
+                    true => None,
+                    false => Some(res.unwrap()),
+                }
+            },
             mono_assembly_get_image: Some(lib.sym("mono_assembly_get_image")?),
             mono_assembly_get_object: Some(lib.sym("mono_assembly_get_object")?),
             mono_domain_assembly_open: Some(lib.sym("mono_domain_assembly_open")?),

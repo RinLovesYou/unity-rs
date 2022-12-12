@@ -20,7 +20,6 @@
 //! let func: extern fn() = unsafe { mem::transmute(lib.get_fn_ptr("func_name")?) };
 
 use std::{
-    error,
     ffi::c_void,
     marker::PhantomData,
     ops::Deref,
@@ -44,8 +43,8 @@ pub enum LibError {
     FailedToGetLibPath,
 
     /// failed to get function pointer
-    #[error("Failed to get function pointer!")]
-    FailedToGetFnPtr,
+    #[error("Failed to get function pointer: {0}")]
+    FailedToGetFnPtr(String),
 
     #[error("Failed to create C-String")]
     FailedToCreateCString,
@@ -83,13 +82,15 @@ impl NativeLibrary {
     pub fn sym<T>(&self, name_str: &str) -> Result<NativeMethod<T>, LibError> {
         use std::ffi::CString;
 
+        let display_string = name_str.to_string();
+
         use winapi::um::libloaderapi::GetProcAddress;
 
         let name = CString::new(name_str).map_err(|_| LibError::FailedToCreateCString)?;
 
         let ptr = unsafe { GetProcAddress(self.handle.cast(), name.as_ptr()) };
         if ptr.is_null() {
-            return Err(LibError::FailedToGetFnPtr);
+            return Err(LibError::FailedToGetFnPtr(display_string));
         }
 
         Ok(NativeMethod {

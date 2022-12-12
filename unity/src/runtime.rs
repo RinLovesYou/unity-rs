@@ -145,11 +145,11 @@ fn detect_runtime() -> Result<UnityRuntime, RuntimeError> {
 
     if let Ok(mono_path) = mono {
         Ok(UnityRuntime::MonoRuntime(
-            Mono::new(mono_path).map_err(|_| RuntimeError::FailedToInitRuntime)?,
+            Mono::new(mono_path).map_err(|e| RuntimeError::Passthrough(e.to_string()))?,
         ))
     } else {
         Ok(UnityRuntime::Il2Cpp(
-            Il2Cpp::new(base_path).map_err(|_| RuntimeError::FailedToInitRuntime)?,
+            Il2Cpp::new(base_path).map_err(|e| RuntimeError::Passthrough(e.to_string()))?,
         ))
     }
 }
