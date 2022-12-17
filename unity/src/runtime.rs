@@ -1,135 +1,81 @@
 //! TODO
 
-use std::{error, ffi::CString, path::PathBuf};
+use std::{error, path::PathBuf, io};
 
 use thiserror::Error;
 
 use crate::{
-    common::{domain::UnityDomain, thread::UnityThread},
+    common::{domain::UnityDomain, thread::UnityThread, method::{MethodPointer}},
     il2cpp::Il2Cpp,
-    mono::Mono,
-    utils,
+    mono::{Mono, AssemblyHookType},
+    utils, libs::{self, NativeMethod},
 };
 
 #[derive(Debug, Error)]
 pub enum RuntimeError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Fmt(#[from] std::fmt::Error),
+    #[error(transparent)]
+    Std(#[from] Box<dyn error::Error>),
+    #[error(transparent)]
+    Lib(#[from] libs::LibError),
+    #[error(transparent)]
+    Nul(#[from] std::ffi::NulError),
+
     #[error("Not a unity process")]
     NotUnity,
     #[error("Failed to find Base Path")]
     BasePathNotFound,
     #[error("Data Path not found!")]
     DataPathNotFound,
+    #[error("Failed to find mono library path")]
+    MonoLibPath,
+    #[error("Failed to get mono lib name")]
+    MonoLibName,
     #[error("Missing version argument in mono_jit_init_version")]
     JitInitVersionArgMissing,
-    #[error("Missing Function")]
-    MissingFunc,
-    #[error("Function Returned Null")]
-    ReturnedNull,
+    #[error("Function '{0}' not found")]
+    MissingFunction(&'static str),
+    #[error("Function Returned Null at {0}")]
+    ReturnedNull(&'static str),
+    #[error("Failed to get Game Assembly")]
+    GameAssemblyNotFound,
     #[error("Failed to initialize Runtime")]
     FailedToInitRuntime,
     #[error("Failed to create C-String")]
     FailedToCreateCString,
     #[error("{0}")]
     Passthrough(String),
+    #[error("String may not be empty!")]
+    EmptyString,
+    #[error("Argument {0} is a null pointer!")]
+    NullPointer(&'static str),
+    #[error("Not Implemented: {0}")]
+    NotImplemented(&'static str),
 }
 
-#[derive(Debug, Clone)]
-pub enum UnityRuntime {
-    MonoRuntime(Mono),
-    Il2Cpp(Il2Cpp),
+pub enum RuntimeType<'a> {
+    Mono(&'a Mono),
+    Il2Cpp(&'a Il2Cpp)
 }
 
-#[derive(Debug, Clone)]
-pub struct Runtime {
-    pub runtime: UnityRuntime,
+pub trait Runtime {
+    fn get_type(&self) -> RuntimeType;
+    fn get_domain(&self) -> Result<UnityDomain, RuntimeError>;
+    fn get_current_thread(&self) -> Result<UnityThread, RuntimeError>;
+    fn set_main_thread(&self, thread: UnityThread) -> Result<(), RuntimeError>;
+    fn attach_to_thread(&self, thread: UnityDomain) -> Result<UnityThread, RuntimeError>;
+    fn add_internal_call(&self, name: String, func: MethodPointer) -> Result<(), RuntimeError>;
+    fn install_assembly_hook(&self, hook_type: AssemblyHookType, func: MethodPointer) -> Result<(), RuntimeError>;
+    fn get_export_ptr(&self, name: &str) -> Result<MethodPointer, RuntimeError>;
 }
 
-impl Runtime {
-    pub fn new() -> Result<Self, RuntimeError> {
-        Ok(Self {
-            runtime: detect_runtime()?,
-        })
-    }
-
-    /// the equivalent of `mono_jit_init_version` or `il2cpp_init`
-    ///
-    /// `mono_jit_init_version` requires a name, and a version
-    ///
-    /// `il2cpp_init` just requires a name, it'll ignore the second parameter
-    pub fn init(
-        &self,
-        name: impl Into<String>,
-        version: Option<impl Into<String>>,
-    ) -> Result<UnityDomain, RuntimeError> {
-        let name = name.into();
-        let name = CString::new(name).map_err(|_| RuntimeError::FailedToCreateCString)?;
-        match self.runtime.clone() {
-            UnityRuntime::MonoRuntime(mono) => {
-                if version.is_none() {
-                    return Err(RuntimeError::JitInitVersionArgMissing);
-                }
-
-                let version = version.ok_or_else(|| RuntimeError::JitInitVersionArgMissing)?;
-
-                let version = version.into();
-                let version =
-                    CString::new(version).map_err(|_| RuntimeError::FailedToCreateCString)?;
-
-                let func = mono
-                    .exports
-                    .mono_jit_init_version
-                    .ok_or_else(|| RuntimeError::MissingFunc)?;
-
-                let res = func(name.as_ptr(), version.as_ptr());
-
-                if res.is_null() {
-                    Err(RuntimeError::ReturnedNull)
-                } else {
-                    Ok(UnityDomain { inner: res.cast() })
-                }
-            }
-
-            UnityRuntime::Il2Cpp(il2cpp) => {
-                let func = il2cpp
-                    .exports
-                    .il2cpp_init
-                    .ok_or_else(|| RuntimeError::MissingFunc)?;
-
-                let res = func(name.as_ptr());
-
-                if res.is_null() {
-                    Err(RuntimeError::ReturnedNull)
-                } else {
-                    Ok(UnityDomain { inner: res.cast() })
-                }
-            }
-        }
-    }
-
-    pub fn get_current_thread(&self) -> Result<UnityThread, RuntimeError> {
-        match self.clone().runtime {
-            UnityRuntime::MonoRuntime(mono) => {
-                let res = mono
-                    .thread_current()
-                    .map_err(|e| RuntimeError::Passthrough(e.to_string()))?;
-
-                Ok(UnityThread { inner: res.cast() })
-            }
-
-            UnityRuntime::Il2Cpp(il2cpp) => {
-                let res = il2cpp
-                    .thread_current()
-                    .map_err(|e| RuntimeError::Passthrough(e.to_string()))?;
-
-                Ok(UnityThread { inner: res.cast() })
-            }
-        }
-    }
-}
 
 /// looks up the runtime
-fn detect_runtime() -> Result<UnityRuntime, RuntimeError> {
-    let exe_path = std::env::current_exe().map_err(|_| RuntimeError::BasePathNotFound)?;
+pub fn get_runtime() -> Result<Box<dyn Runtime>, RuntimeError> {
+    let exe_path = std::env::current_exe()?;
     if !is_unity(&exe_path)? {
         return Err(RuntimeError::NotUnity);
     }
@@ -139,31 +85,29 @@ fn detect_runtime() -> Result<UnityRuntime, RuntimeError> {
         .ok_or(RuntimeError::BasePathNotFound)?
         .to_path_buf();
     let data_path =
-        utils::path::get_data_path(&exe_path).map_err(|_| RuntimeError::DataPathNotFound)?;
+        utils::path::get_data_path(&exe_path)?;
 
     let mono = utils::path::find_mono(&base_path, &data_path);
 
     if let Ok(mono_path) = mono {
-        Ok(UnityRuntime::MonoRuntime(
-            Mono::new(mono_path).map_err(|e| RuntimeError::Passthrough(e.to_string()))?,
-        ))
+        let mono = Mono::new(mono_path)?;
+        Ok(Box::new(mono))
     } else {
-        Ok(UnityRuntime::Il2Cpp(
-            Il2Cpp::new(base_path).map_err(|e| RuntimeError::Passthrough(e.to_string()))?,
-        ))
+        let il2cpp = Il2Cpp::new(base_path)?;
+        Ok(Box::new(il2cpp))
     }
 }
 
 fn is_unity(file_path: &PathBuf) -> Result<bool, RuntimeError> {
     let file_name = file_path
         .file_stem()
-        .ok_or_else(|| RuntimeError::BasePathNotFound)?
+        .ok_or(RuntimeError::BasePathNotFound)?
         .to_str()
-        .ok_or_else(|| RuntimeError::BasePathNotFound)?;
+        .ok_or(RuntimeError::BasePathNotFound)?;
 
     let base_folder = file_path
         .parent()
-        .ok_or_else(|| RuntimeError::BasePathNotFound)?;
+        .ok_or(RuntimeError::BasePathNotFound)?;
 
     let data_path = base_folder.join(format!("{}_Data", file_name));
 

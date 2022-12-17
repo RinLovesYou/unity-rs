@@ -21,6 +21,7 @@ pub struct Il2CppExports {
     pub il2cpp_method_get_name: Option<NativeMethod<fn(*mut Il2CppMethod) -> *const c_char>>,
     pub il2cpp_thread_attach: Option<NativeMethod<fn(*mut Il2CppDomain) -> *mut Il2CppThread>>,
     pub il2cpp_domain_get: Option<NativeMethod<fn() -> *mut Il2CppDomain>>,
+    pub il2cpp_add_internal_call: Option<NativeMethod<fn(*const c_char, *mut c_void)>>,
 }
 
 impl Il2CppExports {
@@ -33,6 +34,7 @@ impl Il2CppExports {
             il2cpp_method_get_name: Some(lib.sym("il2cpp_method_get_name")?),
             il2cpp_thread_attach: Some(lib.sym("il2cpp_thread_attach")?),
             il2cpp_domain_get: Some(lib.sym("il2cpp_domain_get")?),
+            il2cpp_add_internal_call: Some(lib.sym("il2cpp_add_internal_call")?),
         })
     }
 }
